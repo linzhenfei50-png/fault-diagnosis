@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="可配置的设备故障诊断前端界面" />
+  <title>智能故障诊断系统</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">◆</div>
+        <div>
+          <strong>智能故障诊断</strong>
+          <small>Fault Diagnosis</small>
+        </div>
+      </div>
+
+      <nav class="nav-list" aria-label="主导航">
+        <button class="nav-item active" type="button">故障诊断</button>
+        <button class="nav-item" type="button">历史记录</button>
+        <button class="nav-item" type="button">知识库</button>
+        <button class="nav-item" type="button">设备管理</button>
+      </nav>
+
+      <div class="sidebar-tip">
+        <strong>数据维护方式</strong>
+        <p>直接编辑 <code>data/faults.js</code> 即可新增或修改故障知识。</p>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">设备运维辅助工具</p>
+          <h1>故障诊断</h1>
+        </div>
+        <button id="clearHistoryButton" class="text-button" type="button">清空本地记录</button>
+      </header>
+
+      <section class="search-card card">
+        <div class="section-heading">
+          <div>
+            <span class="section-index">01</span>
+            <h2>输入故障现象</h2>
+          </div>
+          <span class="data-status" id="dataStatus">知识库已加载</span>
+        </div>
+
+        <div class="field-grid">
+          <label class="field">
+            <span>设备类型</span>
+            <select id="deviceType">
+              <option value="">全部设备</option>
+            </select>
+          </label>
+
+          <label class="field field-wide">
+            <span>故障现象</span>
+            <textarea id="symptomInput" rows="4" maxlength="300" placeholder="例如：电机启动后有嗡嗡声，但转轴不转，十秒后保护器跳闸。"></textarea>
+            <small><span id="charCount">0</span>/300</small>
+          </label>
+        </div>
+
+        <div class="search-actions">
+          <div id="quickExamples" class="quick-examples" aria-label="示例故障"></div>
+          <button id="diagnoseButton" class="primary-button" type="button">开始诊断</button>
+        </div>
+      </section>
+
+      <section id="emptyState" class="empty-state card">
+        <div class="empty-icon">⌁</div>
+        <h2>等待输入故障现象</h2>
+        <p>系统会根据关键词和设备类型，从本地故障知识库中匹配最相关的诊断方案。</p>
+      </section>
+
+      <section id="resultSection" class="result-section hidden" aria-live="polite">
+        <div class="summary-grid">
+          <article class="card summary-card">
+            <span class="card-label">诊断摘要</span>
+            <h2 id="resultTitle">—</h2>
+            <p id="resultSummary">—</p>
+            <div class="meta-row">
+              <span id="severityBadge" class="badge">—</span>
+              <span id="shutdownBadge" class="badge secondary">—</span>
+              <span id="timeBadge" class="badge secondary">—</span>
+            </div>
+          </article>
+
+          <article class="card match-card">
+            <span class="card-label">匹配结果</span>
+            <strong id="matchScore">0%</strong>
+            <p id="matchExplanation">—</p>
+          </article>
+        </div>
+
+        <div class="diagnosis-grid">
+          <article class="card">
+            <div class="section-heading compact">
+              <div>
+                <span class="section-index danger">02</span>
+                <h2>可能原因</h2>
+              </div>
+            </div>
+            <div id="causeList" class="cause-list"></div>
+          </article>
+
+          <article class="card">
+            <div class="section-heading compact">
+              <div>
+                <span class="section-index success">03</span>
+                <h2>解决措施</h2>
+              </div>
+            </div>
+            <div id="solutionList" class="solution-list"></div>
+          </article>
+        </div>
+
+        <article class="card diagram-card">
+          <div class="section-heading compact">
+            <div>
+              <span class="section-index warning">04</span>
+              <h2>排查流程示意图</h2>
+            </div>
+          </div>
+          <div id="diagramFlow" class="diagram-flow"></div>
+        </article>
+
+        <article id="safetyCard" class="card safety-card">
+          <strong>安全提示</strong>
+          <p id="safetyText">—</p>
+        </article>
+      </section>
+
+      <section class="history-section card">
+        <div class="section-heading compact">
+          <div>
+            <span class="section-index">05</span>
+            <h2>最近诊断</h2>
+          </div>
+        </div>
+        <div id="historyList" class="history-list"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="./data/faults.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
