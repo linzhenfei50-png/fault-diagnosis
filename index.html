@@ -12,140 +12,275 @@
     <aside class="sidebar">
       <div class="brand">
         <div class="brand-mark">◆</div>
-        <div>
+        <div class="brand-text">
           <strong>智能故障诊断</strong>
           <small>Fault Diagnosis</small>
         </div>
       </div>
 
       <nav class="nav-list" aria-label="主导航">
-        <button class="nav-item active" type="button">故障诊断</button>
-        <button class="nav-item" type="button">历史记录</button>
-        <button class="nav-item" type="button">知识库</button>
-        <button class="nav-item" type="button">设备管理</button>
+        <button class="nav-item active" type="button" data-panel="diagnose">
+          <span class="nav-icon">🔍</span> 故障诊断
+        </button>
+        <button class="nav-item" type="button" data-panel="history">
+          <span class="nav-icon">📋</span> 历史记录
+        </button>
+        <button class="nav-item" type="button" data-panel="knowledge">
+          <span class="nav-icon">📚</span> 知识库
+        </button>
+        <button class="nav-item" type="button" data-panel="import">
+          <span class="nav-icon">📥</span> 导入数据
+        </button>
       </nav>
 
       <div class="sidebar-tip">
-        <strong>数据维护方式</strong>
-        <p>直接编辑 <code>data/faults.js</code> 即可新增或修改故障知识。</p>
+        <strong>数据维护</strong>
+        <p>编辑 <code>data/faults.js</code> 新增条目；或通过「导入数据」批量导入 JSON。</p>
       </div>
     </aside>
 
     <main class="main-content">
-      <header class="topbar">
-        <div>
-          <p class="eyebrow">设备运维辅助工具</p>
-          <h1>故障诊断</h1>
-        </div>
-        <button id="clearHistoryButton" class="text-button" type="button">清空本地记录</button>
-      </header>
 
-      <section class="search-card card">
-        <div class="section-heading">
+      <!-- ==================== 故障诊断 ==================== -->
+      <section id="panelDiagnose" class="panel active">
+        <header class="topbar">
           <div>
-            <span class="section-index">01</span>
-            <h2>输入故障现象</h2>
+            <p class="eyebrow">设备运维辅助工具</p>
+            <h1>故障诊断</h1>
           </div>
-          <span class="data-status" id="dataStatus">知识库已加载</span>
-        </div>
+          <div class="topbar-actions">
+            <span class="data-status" id="dataStatus">知识库已加载</span>
+          </div>
+        </header>
 
-        <div class="field-grid">
-          <label class="field">
-            <span>设备类型</span>
-            <select id="deviceType">
-              <option value="">全部设备</option>
-            </select>
-          </label>
-
-          <label class="field field-wide">
-            <span>故障现象</span>
-            <textarea id="symptomInput" rows="4" maxlength="300" placeholder="例如：电机启动后有嗡嗡声，但转轴不转，十秒后保护器跳闸。"></textarea>
-            <small><span id="charCount">0</span>/300</small>
-          </label>
-        </div>
-
-        <div class="search-actions">
-          <div id="quickExamples" class="quick-examples" aria-label="示例故障"></div>
-          <button id="diagnoseButton" class="primary-button" type="button">开始诊断</button>
-        </div>
-      </section>
-
-      <section id="emptyState" class="empty-state card">
-        <div class="empty-icon">⌁</div>
-        <h2>等待输入故障现象</h2>
-        <p>系统会根据关键词和设备类型，从本地故障知识库中匹配最相关的诊断方案。</p>
-      </section>
-
-      <section id="resultSection" class="result-section hidden" aria-live="polite">
-        <div class="summary-grid">
-          <article class="card summary-card">
-            <span class="card-label">诊断摘要</span>
-            <h2 id="resultTitle">—</h2>
-            <p id="resultSummary">—</p>
-            <div class="meta-row">
-              <span id="severityBadge" class="badge">—</span>
-              <span id="shutdownBadge" class="badge secondary">—</span>
-              <span id="timeBadge" class="badge secondary">—</span>
-            </div>
-          </article>
-
-          <article class="card match-card">
-            <span class="card-label">匹配结果</span>
-            <strong id="matchScore">0%</strong>
-            <p id="matchExplanation">—</p>
-          </article>
-        </div>
-
-        <div class="diagnosis-grid">
-          <article class="card">
-            <div class="section-heading compact">
-              <div>
-                <span class="section-index danger">02</span>
-                <h2>可能原因</h2>
-              </div>
-            </div>
-            <div id="causeList" class="cause-list"></div>
-          </article>
-
-          <article class="card">
-            <div class="section-heading compact">
-              <div>
-                <span class="section-index success">03</span>
-                <h2>解决措施</h2>
-              </div>
-            </div>
-            <div id="solutionList" class="solution-list"></div>
-          </article>
-        </div>
-
-        <article class="card diagram-card">
-          <div class="section-heading compact">
+        <section class="search-card card">
+          <div class="section-heading">
             <div>
-              <span class="section-index warning">04</span>
-              <h2>排查流程示意图</h2>
+              <span class="section-index">01</span>
+              <h2>输入故障现象</h2>
             </div>
           </div>
-          <div id="diagramFlow" class="diagram-flow"></div>
-        </article>
 
-        <article id="safetyCard" class="card safety-card">
-          <strong>安全提示</strong>
-          <p id="safetyText">—</p>
-        </article>
-      </section>
+          <div class="field-grid">
+            <label class="field">
+              <span>设备类型</span>
+              <select id="deviceType">
+                <option value="">全部设备</option>
+              </select>
+            </label>
 
-      <section class="history-section card">
-        <div class="section-heading compact">
-          <div>
-            <span class="section-index">05</span>
-            <h2>最近诊断</h2>
+            <label class="field field-wide">
+              <span>故障现象</span>
+              <textarea id="symptomInput" rows="4" maxlength="300"
+                placeholder="例如：电机启动后有嗡嗡声，但转轴不转，十秒后保护器跳闸。"></textarea>
+              <small><span id="charCount">0</span> / 300</small>
+            </label>
           </div>
-        </div>
-        <div id="historyList" class="history-list"></div>
+
+          <div class="search-actions">
+            <div id="quickExamples" class="quick-examples" aria-label="示例故障"></div>
+            <button id="diagnoseButton" class="primary-button" type="button">开始诊断</button>
+          </div>
+        </section>
+
+        <section id="emptyState" class="empty-state card">
+          <div class="empty-icon">⌁</div>
+          <h2>等待输入故障现象</h2>
+          <p>系统根据关键词和设备类型，从本地知识库中匹配最相关的诊断方案。</p>
+        </section>
+
+        <section id="resultSection" class="result-section hidden" aria-live="polite">
+          <div class="summary-grid">
+            <article class="card summary-card">
+              <span class="card-label">诊断摘要</span>
+              <h2 id="resultTitle">—</h2>
+              <p id="resultSummary">—</p>
+              <div class="meta-row">
+                <span id="severityBadge" class="badge">—</span>
+                <span id="shutdownBadge" class="badge secondary">—</span>
+                <span id="timeBadge" class="badge secondary">—</span>
+              </div>
+            </article>
+
+            <article class="card match-card">
+              <span class="card-label">匹配度</span>
+              <strong id="matchScore">—</strong>
+              <p id="matchExplanation">—</p>
+            </article>
+          </div>
+
+          <div class="diagnosis-grid">
+            <article class="card">
+              <div class="section-heading">
+                <div>
+                  <span class="section-index danger">02</span>
+                  <h2>可能原因</h2>
+                </div>
+              </div>
+              <div id="causeList" class="cause-list"></div>
+            </article>
+
+            <article class="card">
+              <div class="section-heading">
+                <div>
+                  <span class="section-index success">03</span>
+                  <h2>解决措施</h2>
+                </div>
+              </div>
+              <div id="solutionList" class="solution-list"></div>
+            </article>
+          </div>
+
+          <article class="card diagram-card">
+            <div class="section-heading">
+              <div>
+                <span class="section-index warning">04</span>
+                <h2>排查流程</h2>
+              </div>
+            </div>
+            <div id="diagramFlow" class="diagram-flow"></div>
+          </article>
+
+          <article id="safetyCard" class="card safety-card">
+            <strong>⚠ 安全提示</strong>
+            <p id="safetyText">—</p>
+          </article>
+        </section>
+
+        <section class="history-section card">
+          <div class="section-heading">
+            <div>
+              <span class="section-index">05</span>
+              <h2>最近诊断</h2>
+            </div>
+            <button id="clearHistoryButton" class="text-button" type="button">清空</button>
+          </div>
+          <div id="historyList" class="history-list"></div>
+        </section>
       </section>
+
+      <!-- ==================== 历史记录 ==================== -->
+      <section id="panelHistory" class="panel">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">诊断记录回溯</p>
+            <h1>历史记录</h1>
+          </div>
+          <div class="topbar-actions">
+            <button id="exportHistoryBtn" class="outline-button" type="button">导出 JSON</button>
+            <button id="clearAllHistoryBtn" class="text-button" type="button">清空全部</button>
+          </div>
+        </header>
+
+        <section class="search-card card">
+          <div class="history-toolbar">
+            <div class="field" style="flex:1; min-width:200px;">
+              <span>搜索</span>
+              <input type="text" id="historySearch" placeholder="按故障现象、设备、诊断结果搜索…" />
+            </div>
+            <div class="field" style="width:160px;">
+              <span>设备筛选</span>
+              <select id="historyDeviceFilter">
+                <option value="">全部设备</option>
+              </select>
+            </div>
+          </div>
+        </section>
+
+        <section class="card" style="margin-top:16px; padding:20px 24px;">
+          <div class="section-heading">
+            <h2>诊断记录</h2>
+            <small id="historyCount" style="color:var(--text-tertiary); font-size:12px;"></small>
+          </div>
+          <div id="fullHistoryList" class="full-history-list"></div>
+          <div id="historyPagination" class="pagination"></div>
+        </section>
+      </section>
+
+      <!-- ==================== 知识库管理 ==================== -->
+      <section id="panelKnowledge" class="panel">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">知识条目维护</p>
+            <h1>知识库</h1>
+          </div>
+          <div class="topbar-actions">
+            <span class="data-status" id="knowledgeStatus">—</span>
+          </div>
+        </header>
+
+        <section class="card" style="padding:20px 24px;">
+          <div class="section-heading">
+            <h2>条目列表</h2>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <input type="text" id="knowledgeSearch" placeholder="搜索条目…" style="width:200px;" />
+              <button id="clearImportedBtn" class="text-button" type="button">清空导入</button>
+            </div>
+          </div>
+          <div id="knowledgeList" class="knowledge-grid"></div>
+        </section>
+      </section>
+
+      <!-- ==================== 导入数据 ==================== -->
+      <section id="panelImport" class="panel">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">批量导入故障知识</p>
+            <h1>导入数据</h1>
+          </div>
+        </header>
+
+        <section class="card import-dropzone" id="importDropzone">
+          <div class="dropzone-content">
+            <div class="dropzone-icon">📂</div>
+            <h2>拖拽文件夹到此处，或点击选择</h2>
+            <p>支持 JSON 格式的故障条目（单个对象或数组）。选择文件夹后自动递归读取所有 JSON 文件。</p>
+            <div class="import-actions">
+              <button id="selectFolderBtn" class="primary-button" type="button">选择文件夹</button>
+              <button id="selectFilesBtn" class="outline-button" type="button">选择文件</button>
+              <input type="file" id="folderInput" webkitdirectory hidden />
+              <input type="file" id="filesInput" multiple accept=".json" hidden />
+            </div>
+          </div>
+        </section>
+
+        <section id="importPreview" class="card hidden" style="margin-top:16px; padding:20px 24px;">
+          <div class="section-heading">
+            <h2>导入预览</h2>
+            <button id="cancelImportBtn" class="text-button" type="button">取消</button>
+          </div>
+          <div id="importFileList" class="import-file-list"></div>
+          <div style="margin-top:16px; display:flex; gap:10px; align-items:center;">
+            <button id="confirmImportBtn" class="primary-button" type="button">确认导入</button>
+            <span id="importSummary" style="font-size:13px; color:var(--text-secondary);"></span>
+          </div>
+        </section>
+
+        <section id="importResult" class="card hidden" style="margin-top:16px; padding:20px 24px;"></section>
+
+        <section class="card" style="margin-top:16px; padding:20px 24px;">
+          <div class="section-heading">
+            <h2>导入记录</h2>
+            <button id="clearImportHistoryBtn" class="text-button" type="button">清除</button>
+          </div>
+          <div id="importedFilesList" class="imported-files-list">
+            <p class="history-empty">暂无导入记录。</p>
+          </div>
+        </section>
+      </section>
+
     </main>
   </div>
 
+  <dialog id="importDialog" class="modal">
+    <div class="modal-content">
+      <h2>导入结果</h2>
+      <div id="importDialogBody"></div>
+      <button id="closeImportDialog" class="primary-button" type="button">确定</button>
+    </div>
+  </dialog>
+
+  <script src="./db.js"></script>
   <script src="./data/faults.js"></script>
   <script src="./app.js"></script>
 </body>
