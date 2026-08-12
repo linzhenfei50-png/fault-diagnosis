@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="可配置的设备故障诊断前端界面" />
+  <title>智能故障诊断系统</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">◆</div>
+        <div class="brand-text">
+          <strong>智能故障诊断</strong>
+          <small>Fault Diagnosis</small>
+        </div>
+      </div>
+
+      <nav class="nav-list" aria-label="主导航">
+        <button class="nav-item active" type="button" data-panel="diagnose">
+          <span class="nav-icon">🔍</span> 故障诊断
+        </button>
+        <button class="nav-item" type="button" data-panel="history">
+          <span class="nav-icon">📋</span> 历史记录
+        </button>
+        <button class="nav-item" type="button" data-panel="knowledge">
+          <span class="nav-icon">📚</span> 知识库
+        </button>
+        <button class="nav-item" type="button" data-panel="import">
+          <span class="nav-icon">📥</span> 导入数据
+        </button>
+      </nav>
+
+      <div class="sidebar-tip">
+        <strong>AI 驱动诊断</strong>
+        <p>点击「开始诊断」后调用 <strong>DeepSeek</strong> 大模型分析故障。也可编辑 <code>data/faults.js</code> 扩充知识库。</p>
+      </div>
+    </aside>
+
+    <main class="main-content">
+
+      <!-- ==================== 故障诊断 ==================== -->
+      <section id="panelDiagnose" class="panel active">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">设备运维辅助工具</p>
+            <h1>故障诊断</h1>
+          </div>
+          <div class="topbar-actions">
+            <span class="ai-status" id="aiStatus" title="AI 诊断状态">🤖 AI 就绪</span>
+            <span class="data-status" id="dataStatus">知识库已加载</span>
+            <button id="apiSettingsBtn" class="text-button" type="button" title="API 设置">⚙</button>
+          </div>
+        </header>
+
+        <section class="search-card card">
+          <div class="section-heading">
+            <div>
+              <span class="section-index">01</span>
+              <h2>输入故障现象</h2>
+            </div>
+          </div>
+
+          <div class="field-grid">
+            <label class="field">
+              <span>设备类型</span>
+              <select id="deviceType">
+                <option value="">全部设备</option>
+              </select>
+            </label>
+
+            <label class="field field-wide">
+              <span>故障现象</span>
+              <textarea id="symptomInput" rows="4" maxlength="300"
+                placeholder="例如：电机启动后有嗡嗡声，但转轴不转，十秒后保护器跳闸。"></textarea>
+              <small><span id="charCount">0</span> / 300</small>
+            </label>
+          </div>
+
+          <div class="search-actions">
+            <div id="quickExamples" class="quick-examples" aria-label="示例故障"></div>
+            <button id="diagnoseButton" class="primary-button" type="button">
+              <span class="btn-text">开始诊断</span>
+              <span class="btn-spinner hidden"></span>
+            </button>
+          </div>
+        </section>
+
+        <!-- API 设置面板 -->
+        <section id="apiSettings" class="card api-settings hidden">
+          <div class="section-heading">
+            <div>
+              <span class="section-index" style="background:#f0f4ff; color:#3568f0;">⚙</span>
+              <h2>AI 诊断设置</h2>
+            </div>
+            <button id="closeApiSettings" class="text-button" type="button">收起</button>
+          </div>
+          <div class="api-settings-body">
+            <div class="field" style="flex:1;">
+              <span>DeepSeek API Key</span>
+              <div style="display:flex; gap:8px; align-items:center;">
+                <span id="apiKeyStatus" class="api-key-status">—</span>
+                <input type="password" id="apiKeyInput" class="hidden" placeholder="sk-..." autocomplete="off" />
+                <button id="changeApiKeyBtn" class="outline-button" type="button">更换 Key</button>
+              </div>
+              <small style="color:var(--text-tertiary); font-size:11px;">Key 仅保存在浏览器本地，设置后无法查看，只能更换。</small>
+            </div>
+            <div id="apiKeyActions" class="hidden" style="display:flex; gap:8px; align-items:flex-end;">
+              <button id="saveApiKeyBtn" class="primary-button" type="button">保存</button>
+              <button id="cancelApiKeyBtn" class="text-button" type="button">取消</button>
+            </div>
+            <div style="display:flex; gap:8px; align-items:flex-end;">
+              <button id="testApiBtn" class="outline-button" type="button">测试连接</button>
+              <button id="clearApiKeyBtn" class="text-button" type="button" style="color:var(--danger);">清除 Key</button>
+            </div>
+          </div>
+        </section>
+
+        <section id="emptyState" class="empty-state card">
+          <div id="emptyIcon" class="empty-icon">⌁</div>
+          <h2 id="emptyTitle">等待输入故障现象</h2>
+          <p id="emptyDesc">系统将调用 DeepSeek AI 结合本地知识库进行智能故障诊断。</p>
+        </section>
+
+        <section id="resultSection" class="result-section hidden" aria-live="polite">
+          <!-- 报告头部 -->
+          <article class="card report-header">
+            <div class="report-header-top">
+              <div>
+                <span class="report-badge" id="dbMatchBadge">—</span>
+                <h2 id="resultTitle">—</h2>
+              </div>
+              <div class="report-header-meta">
+                <span id="severityBadge" class="badge">—</span>
+                <span id="timeBadge" class="badge secondary">—</span>
+                <span id="shutdownBadge" class="badge secondary">—</span>
+              </div>
+            </div>
+            <p class="report-summary" id="resultSummary">—</p>
+          </article>
+
+          <!-- 步骤 1：故障识别 -->
+          <article class="card report-step">
+            <div class="step-header">
+              <span class="step-marker">01</span>
+              <h3>故障识别</h3>
+              <span class="step-icon">🔍</span>
+            </div>
+            <div class="step-body" id="stepIdentify">
+              <div class="step-row">
+                <span class="step-label">故障现象</span>
+                <span id="identifySymptom">—</span>
+              </div>
+              <div class="step-row">
+                <span class="step-label">设备 / 子系统</span>
+                <span id="identifyDevice">—</span>
+              </div>
+              <div class="step-row">
+                <span class="step-label">数据库匹配</span>
+                <span id="identifyDbStatus">—</span>
+              </div>
+              <div id="identifyDbNote" class="step-note"></div>
+            </div>
+          </article>
+
+          <!-- 步骤 2：可能原因（交互式排查）-->
+          <article class="card report-step">
+            <div class="step-header">
+              <span class="step-marker">02</span>
+              <h3>可能原因排查</h3>
+              <span class="step-icon">📊</span>
+              <span id="causeProgress" style="font-size:12px;color:var(--text-tertiary);"></span>
+            </div>
+            <div class="step-body" id="stepCauses">
+              <!-- JS 填充交互式原因卡片 -->
+            </div>
+            <div id="causeCheckHint" class="step-note" style="margin-top: 8px; background: #f8f9fb; border-left: 3px solid var(--text-tertiary); color: var(--text-secondary);">
+              💡 点击原因标题展开排查指导；排查后点击 <strong>✅ 确认</strong> 或 <strong>❌ 排除</strong> 标记结果。
+            </div>
+          </article>
+
+          <!-- 步骤 3：根因定位（排查完成后自动生成）-->
+          <article class="card report-step" id="rootCauseStep">
+            <div class="step-header">
+              <span class="step-marker">03</span>
+              <h3>根因定位与报告</h3>
+              <span class="step-icon">🎯</span>
+            </div>
+            <div class="step-body" id="stepRootCause">
+              <p class="history-empty" id="rootCausePending">请先完成上方所有可能原因的排查（标记 ✅ 或 ❌），完成后自动生成根因报告。</p>
+            </div>
+          </article>
+
+          <!-- 步骤 4：指导建议 -->
+          <article class="card report-step">
+            <div class="step-header">
+              <span class="step-marker">04</span>
+              <h3>指导建议</h3>
+              <span class="step-icon">🔧</span>
+            </div>
+            <div class="step-body" id="stepGuidance">
+              <!-- JS 填充建议 -->
+            </div>
+          </article>
+
+          <!-- 安全提示 -->
+          <article id="safetyCard" class="card safety-card">
+            <strong>⚠ 安全提示</strong>
+            <p id="safetyText">—</p>
+          </article>
+        </section>
+
+        <!-- 原因排查详情对话框 -->
+        <dialog id="causeDetailDialog" class="modal cause-detail-modal">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h2 id="causeDetailTitle"></h2>
+              <button id="closeCauseDetail" class="text-button" type="button">✕</button>
+            </div>
+            <div id="causeDetailBody"></div>
+          </div>
+        </dialog>
+
+        <section class="history-section card">
+          <div class="section-heading">
+            <div>
+              <span class="section-index">05</span>
+              <h2>最近诊断</h2>
+            </div>
+            <button id="clearHistoryButton" class="text-button" type="button">清空</button>
+          </div>
+          <div id="historyList" class="history-list"></div>
+        </section>
+      </section>
+
+      <!-- ==================== 历史记录 ==================== -->
+      <section id="panelHistory" class="panel">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">诊断记录回溯</p>
+            <h1>历史记录</h1>
+          </div>
+          <div class="topbar-actions">
+            <button id="exportHistoryBtn" class="outline-button" type="button">导出 JSON</button>
+            <button id="clearAllHistoryBtn" class="text-button" type="button">清空全部</button>
+          </div>
+        </header>
+
+        <section class="search-card card">
+          <div class="history-toolbar">
+            <div class="field" style="flex:1; min-width:200px;">
+              <span>搜索</span>
+              <input type="text" id="historySearch" placeholder="按故障现象、设备、诊断结果搜索…" />
+            </div>
+            <div class="field" style="width:160px;">
+              <span>设备筛选</span>
+              <select id="historyDeviceFilter">
+                <option value="">全部设备</option>
+              </select>
+            </div>
+          </div>
+        </section>
+
+        <section class="card" style="margin-top:16px; padding:20px 24px;">
+          <div class="section-heading">
+            <h2>诊断记录</h2>
+            <small id="historyCount" style="color:var(--text-tertiary); font-size:12px;"></small>
+          </div>
+          <div id="fullHistoryList" class="full-history-list"></div>
+          <div id="historyPagination" class="pagination"></div>
+        </section>
+      </section>
+
+      <!-- ==================== 知识库管理 ==================== -->
+      <section id="panelKnowledge" class="panel">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">知识条目维护</p>
+            <h1>知识库</h1>
+          </div>
+          <div class="topbar-actions">
+            <span class="data-status" id="knowledgeStatus">—</span>
+          </div>
+        </header>
+
+        <section class="card" style="padding:20px 24px;">
+          <div class="section-heading">
+            <h2>条目列表</h2>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <input type="text" id="knowledgeSearch" placeholder="搜索条目…" style="width:200px;" />
+              <button id="clearImportedBtn" class="text-button" type="button">清空导入</button>
+            </div>
+          </div>
+          <div id="knowledgeList" class="knowledge-grid"></div>
+        </section>
+      </section>
+
+      <!-- ==================== 导入数据 ==================== -->
+      <section id="panelImport" class="panel">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">扩充故障知识库</p>
+            <h1>导入数据</h1>
+          </div>
+        </header>
+
+        <!-- 导入方式 Tab -->
+        <section class="card import-tabs-card">
+          <div class="import-tabs">
+            <button class="import-tab active" data-tab="file">📁 文件导入</button>
+            <button class="import-tab" data-tab="text">📝 文字输入</button>
+            <button class="import-tab" data-tab="image">🖼 图片上传</button>
+          </div>
+
+          <!-- Tab 1: 文件导入 -->
+          <div class="import-tab-panel active" id="tabFile">
+            <div class="import-dropzone" id="importDropzone">
+              <div class="dropzone-content">
+                <div class="dropzone-icon">📂</div>
+                <h2>拖拽文件夹到此处，或点击选择</h2>
+                <p>支持 JSON 格式（单个对象或数组）。系统自动递归读取所有 JSON 文件。</p>
+                <div class="import-actions">
+                  <button id="selectFolderBtn" class="primary-button" type="button">选择文件夹</button>
+                  <button id="selectFilesBtn" class="outline-button" type="button">选择文件</button>
+                  <input type="file" id="folderInput" webkitdirectory hidden />
+                  <input type="file" id="filesInput" multiple accept=".json" hidden />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab 2: 文字输入 -->
+          <div class="import-tab-panel" id="tabText">
+            <div class="text-import-area">
+              <label class="field">
+                <span>输入故障描述（纯文本）</span>
+                <textarea id="textImportInput" rows="8"
+                  placeholder="用自然语言描述故障现象，AI 会自动提取关键信息并生成结构化条目。例如：
+
+RS485通讯电路板上A、B线路上的限流电阻出现烧毁现象。经排查，来料检无异常，ICT和FCT测试均通过。初步判断为现场接线错误导致，可能原因包括：A、B线之间误接220V交流电导致两颗电阻同时烧毁，或A线、B线分别对地误接220V交流电导致对应单颗电阻烧毁。"></textarea>
+                <small id="textCharCount">0 字符</small>
+              </label>
+
+              <div class="text-import-actions">
+                <button id="aiParseTextBtn" class="primary-button" type="button">🤖 AI 智能解析</button>
+                <button id="manualEntryBtn" class="outline-button" type="button">手动填写</button>
+              </div>
+
+              <!-- AI 解析/手动填写后出现的表单 -->
+              <div id="textEntryForm" class="text-entry-form hidden">
+                <div class="section-heading">
+                  <h2>📋 编辑条目</h2>
+                  <span id="textEntrySource" style="font-size:11px;color:var(--text-tertiary);"></span>
+                </div>
+                <div class="field-grid" style="grid-template-columns:1fr 1fr; gap:10px;">
+                  <label class="field"><span>故障 ID</span><input type="text" id="textEntryId" placeholder="唯一标识，如 rs485-resistor-burn" /></label>
+                  <label class="field"><span>设备类型</span><input type="text" id="textEntryDevice" placeholder="如 通讯电路板" /></label>
+                </div>
+                <label class="field" style="margin-top:8px;"><span>故障标题</span><input type="text" id="textEntryTitle" placeholder="简要标题" /></label>
+                <label class="field" style="margin-top:8px;"><span>故障现象</span><input type="text" id="textEntrySymptoms" placeholder="如：A、B线路限流电阻烧毁" /></label>
+                <label class="field" style="margin-top:8px;"><span>关键词（逗号分隔）</span><input type="text" id="textEntryKeywords" placeholder="如：RS485, 电阻, 烧毁, 限流" /></label>
+                <label class="field" style="margin-top:8px;"><span>诊断摘要</span><textarea id="textEntrySummary" rows="2" placeholder="对故障的简要分析…"></textarea></label>
+                <label class="field" style="margin-top:8px;">
+                  <span>严重等级</span>
+                  <select id="textEntrySeverity"><option value="中">中</option><option value="高">高</option><option value="低">低</option></select>
+                </label>
+                <button id="saveTextEntryBtn" class="primary-button" type="button" style="margin-top:14px;">保存到知识库</button>
+              </div>
+
+              <!-- 也支持直接粘贴 JSON -->
+              <details style="margin-top:12px;">
+                <summary style="font-size:12px;color:var(--text-tertiary);cursor:pointer;">或者直接粘贴 JSON（高级）</summary>
+                <textarea id="jsonPasteInput" rows="6" placeholder='粘贴 JSON 条目…' style="margin-top:6px; width:100%; font-family:monospace; font-size:12px; padding:10px; border:1px solid var(--border); border-radius:8px;"></textarea>
+                <button id="parseJsonBtn" class="outline-button" type="button" style="margin-top:6px;">解析 JSON</button>
+              </details>
+            </div>
+          </div>
+
+          <!-- Tab 3: 图片上传 -->
+          <div class="import-tab-panel" id="tabImage">
+            <div class="image-import-area">
+              <div class="image-dropzone" id="imageDropzone">
+                <div class="dropzone-content">
+                  <div class="dropzone-icon">🖼</div>
+                  <h2>拖拽图片到此处，或点击上传</h2>
+                  <p>上传故障现场照片、电路板照片、设备铭牌等图片作为知识库参考附件。支持 JPG/PNG/WebP，单张不超过 5MB。</p>
+                  <div class="import-actions">
+                    <button id="selectImagesBtn" class="primary-button" type="button">选择图片</button>
+                    <input type="file" id="imageInput" multiple accept="image/jpeg,image/png,image/webp" hidden />
+                  </div>
+                </div>
+              </div>
+              <div id="imagePreviewGrid" class="image-preview-grid"></div>
+              <div id="imageEntryForm" class="image-entry-form hidden">
+                <div class="section-heading"><h2>录入故障信息</h2></div>
+                <div class="field-grid" style="grid-template-columns:1fr 1fr;">
+                  <label class="field"><span>故障 ID</span><input type="text" id="imageEntryId" placeholder="如 rs485-resistor-burn" /></label>
+                  <label class="field"><span>设备类型</span><input type="text" id="imageEntryDevice" placeholder="如 通讯电路板" /></label>
+                </div>
+                <label class="field" style="margin-top:10px;"><span>故障标题</span><input type="text" id="imageEntryTitle" placeholder="简要描述故障" /></label>
+                <label class="field" style="margin-top:10px;"><span>故障描述</span><textarea id="imageEntryDesc" rows="3" placeholder="详细描述图片中的故障现象…"></textarea></label>
+                <button id="saveImageEntryBtn" class="primary-button" type="button" style="margin-top:12px;">保存条目</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 导入预览（文件/文字共用） -->
+        <section id="importPreview" class="card hidden" style="margin-top:16px; padding:20px 24px;">
+          <div class="section-heading">
+            <h2>导入预览</h2>
+            <button id="cancelImportBtn" class="text-button" type="button">取消</button>
+          </div>
+          <div id="importFileList" class="import-file-list"></div>
+          <div style="margin-top:16px; display:flex; gap:10px; align-items:center;">
+            <button id="confirmImportBtn" class="primary-button" type="button">确认导入</button>
+            <span id="importSummary" style="font-size:13px; color:var(--text-secondary);"></span>
+          </div>
+        </section>
+
+        <section id="importResult" class="card hidden" style="margin-top:16px; padding:20px 24px;"></section>
+
+        <section class="card" style="margin-top:16px; padding:20px 24px;">
+          <div class="section-heading">
+            <h2>导入记录</h2>
+            <button id="clearImportHistoryBtn" class="text-button" type="button">清除</button>
+          </div>
+          <div id="importedFilesList" class="imported-files-list">
+            <p class="history-empty">暂无导入记录。</p>
+          </div>
+        </section>
+      </section>
+
+    </main>
+  </div>
+
+  <dialog id="importDialog" class="modal">
+    <div class="modal-content">
+      <h2>导入结果</h2>
+      <div id="importDialogBody"></div>
+      <button id="closeImportDialog" class="primary-button" type="button">确定</button>
+    </div>
+  </dialog>
+
+  <script src="./db.js"></script>
+  <script src="./data/faults.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
