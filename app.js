@@ -1321,7 +1321,7 @@
   els.historyList.addEventListener("click", async (event) => {
     const btn = event.target.closest("[data-history-id]");
     if (!btn) return;
-    const id = Number(btn.dataset.historyId);
+    const id = btn.dataset.historyId;
     try {
       const all = await window.FaultDB.history.getList(200, 0);
       const record = all.find(r => r.id === id);
@@ -1390,7 +1390,7 @@
     const delBtn = event.target.closest("[data-del-id]");
 
     if (viewBtn) {
-      const id = Number(viewBtn.dataset.viewId);
+      const id = viewBtn.dataset.viewId;
       try {
         const all = await window.FaultDB.history.getList(200, 0);
         const record = all.find(r => r.id === id);
@@ -1410,7 +1410,7 @@
     }
 
     if (delBtn) {
-      const id = Number(delBtn.dataset.delId);
+      const id = delBtn.dataset.delId;
       if (confirm("确定删除这条诊断记录？")) {
         await window.FaultDB.history.remove(id);
         await renderFullHistory(

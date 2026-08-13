@@ -1,0 +1,18 @@
+{
+  "envId": "fault-diagnosis-d5fe6kc909f3385d",
+  "functionRoot": "./functions",
+  "functions": [
+    {
+      "name": "fault-diagnosis-api",
+      "runtime": "Nodejs16.13",
+      "timeout": 20,
+      "handler": "index.main",
+      "memorySize": 256,
+      "installDependency": true,
+      "envVariables": {
+        "ALLOWED_ORIGIN": "*",
+        "TCB_ENV_ID": "fault-diagnosis-d5fe6kc909f3385d"
+      }
+    }
+  ]
+}

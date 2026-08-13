@@ -1,0 +1,3 @@
+# scf_bootstrap 是 Linux 启动脚本，腾讯云 SCF 运行时要求 LF 换行，
+# 强制保持 LF，避免在 Windows 下被 Git 转成 CRLF 导致部署失败
+cloudbase/functions/*/scf_bootstrap text eol=lf

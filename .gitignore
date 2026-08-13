@@ -13,6 +13,10 @@ desktop.ini
 node_modules/
 dist/
 
-# Cloudflare Workers
-worker/.wrangler/
-worker/node_modules/
+# 本地凭证（切勿提交）
+.env
+.env.*
+!.env.example
+
+# CloudBase
+cloudbase/functions/*/node_modules/

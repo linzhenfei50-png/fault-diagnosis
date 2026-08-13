@@ -12,7 +12,7 @@
   // ======================================================================
   // CONFIG — change this to your deployed Worker URL
   // ======================================================================
-  const API_BASE = "https://fault-diagnosis-api.ticanj.workers.dev/api";
+  const API_BASE = "https://fault-diagnosis-d5fe6kc909f3385d.service.tcloudbase.com/api";
 
   // ======================================================================
   // Transport — thin fetch wrapper with error handling

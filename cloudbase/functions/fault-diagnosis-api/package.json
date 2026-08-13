@@ -1,0 +1,9 @@
+{
+  "name": "fault-diagnosis-api",
+  "version": "1.0.0",
+  "description": "GPU 故障诊断后端（腾讯云云开发云函数）",
+  "main": "index.js",
+  "dependencies": {
+    "@cloudbase/node-sdk": "^3.18.3"
+  }
+}
