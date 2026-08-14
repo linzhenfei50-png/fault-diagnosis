@@ -11,6 +11,9 @@
   const PAGINATE = { history: 12, historyOffset: 0, historyTotal: 0 };
   let pendingImportEntries = [];   // 待确认导入的条目
   let currentPanel = "diagnose";
+  let currentCauses = [];          // 当前诊断结果的原因数组（含 per-cause guidance，供根因定位后生成预防建议）
+  let currentItem = null;          // 当前诊断结果条目（用于回退到全局预防建议）
+  let diagnosisCountsCache = null; // 知识库「诊断次数」缓存（对应故障数量）
 
   /* ================================================================
    *  DOM 引用
@@ -240,7 +243,16 @@
   "databaseNote": "如果匹配：说明匹配到了什么；如果未匹配：说明这是新故障类型。20-40字",
 
   "causes": [
-    { "name": "原因名称", "probability": 40, "evidence": "判断依据一句话" }
+    {
+      "name": "原因名称",
+      "probability": 40,
+      "evidence": "判断依据一句话",
+      "guidance": {
+        "steps": ["针对该原因的排查步骤1", "排查步骤2", "排查步骤3"],
+        "tools": ["所需工具"],
+        "prevention": "针对该原因复发的一两句预防建议"
+      }
+    }
   ],
 
   "eliminations": [
@@ -263,6 +275,7 @@
 
 规则：
 - causes 列出3-5个可能原因，probability 总和100
+- 每个 cause 都必须包含 guidance.steps（针对该原因的具体排查/整改步骤，2-5条）、guidance.tools（该原因排查所需工具）和 guidance.prevention（针对该原因复发的预防建议）
 - eliminations 至少包含2个被排除项和1个确认项，体现排除推理过程
 - rootCauses 给出1-3个最可能的根因，具体描述故障场景
 - guidance.steps 给出3-5个可操作的排查/整改步骤
@@ -319,7 +332,10 @@
       estimatedTime: result.estimatedTime || "",
       databaseMatch: Boolean(result.databaseMatch),
       databaseNote: result.databaseNote || "",
-      causes: Array.isArray(result.causes) ? result.causes : [],
+      causes: (Array.isArray(result.causes) ? result.causes : []).map(c => ({
+        ...c,
+        guidance: c.guidance || {}
+      })),
       eliminations: Array.isArray(result.eliminations) ? result.eliminations : [],
       rootCauses: Array.isArray(result.rootCauses) ? result.rootCauses : [],
       guidance: result.guidance || { steps: [], tools: [], prevention: "" },
@@ -533,6 +549,29 @@
     els.emptyDesc.textContent = message;
   }
 
+  function renderCauseGuidanceHtml(cause, elim) {
+    const guidance = cause?.guidance || {};
+    const steps = Array.isArray(guidance.steps) ? guidance.steps : [];
+    const tools = Array.isArray(guidance.tools) ? guidance.tools : [];
+
+    if (steps.length) {
+      const stepsHtml = steps.map((step, i) => `
+        <div class="guidance-item">
+          <span class="guidance-num">${i + 1}</span>
+          <div><p>${escapeHtml(step)}</p></div>
+        </div>
+      `).join("");
+      const toolsHtml = tools.length
+        ? `<div class="cause-guidance-tools">🔧 所需工具：${tools.map(t => escapeHtml(t)).join("、")}</div>`
+        : "";
+      return `<div class="guidance-steps">${stepsHtml}</div>${toolsHtml}`;
+    }
+
+    // 无针对性分步指导时，退回显示判断依据/说明
+    const text = elim?.evidence || cause?.evidence || "请根据现场情况逐一核实此原因。";
+    return `<p>${escapeHtml(text)}</p>`;
+  }
+
   function renderResult(item, score, matchedKeywords, input, isAI = false) {
     els.emptyState.classList.add("hidden");
     els.resultSection.classList.remove("hidden");
@@ -574,6 +613,8 @@
 
     /* ---- 步骤2：可能原因排查（交互式）---- */
     const causes = item.causes || [];
+    currentCauses = causes;
+    currentItem = item;
     const elims = item.eliminations || [];
     // 把 AI 的 eliminations 合并到对应 cause 中
     const elimMap = new Map();
@@ -602,7 +643,7 @@
           <div class="cause-detail-panel hidden" id="causeDetailPanel${i}">
             <div class="cause-detail-inner">
               <strong>🔍 排查指导</strong>
-              <p>${escapeHtml(elim?.evidence || c.evidence || "请根据现场情况逐一核实此原因。")}</p>
+              ${renderCauseGuidanceHtml(c, elim)}
               <div class="cause-detail-actions">
                 <button class="primary-button small" data-cause-mark="${i}" data-mark="confirm">✅ 确认为此原因</button>
                 <button class="outline-button small" data-cause-mark="${i}" data-mark="ruleout">❌ 排除此原因</button>
@@ -625,35 +666,8 @@
     els.stepRootCause.innerHTML = "";
     els.stepRootCause.appendChild(els.rootCausePending);
 
-    /* ---- 步骤4：指导建议 ---- */
-    const guidance = item.guidance || {};
-    const gSteps = guidance.steps || [];
-    if (gSteps.length) {
-      els.stepGuidance.innerHTML = `
-        <div class="guidance-steps">${gSteps.map((step, i) => `
-          <div class="guidance-item">
-            <span class="guidance-num">${i + 1}</span>
-            <div><p>${escapeHtml(step)}</p></div>
-          </div>
-        `).join("")}</div>
-        ${guidance.tools?.length ? `<div style="margin-top:10px;font-size:12px;color:var(--text-tertiary);">🔧 所需工具：${guidance.tools.map(t => escapeHtml(t)).join("、")}</div>` : ""}
-        ${guidance.prevention ? `<div class="step-note match-found" style="margin-top:10px;">💡 预防建议：${escapeHtml(guidance.prevention)}</div>` : ""}
-      `;
-    } else {
-      // fallback: use solutions
-      const sols = item.solutions || [];
-      els.stepGuidance.innerHTML = sols.length ? `
-        <div class="guidance-steps">${sols.map((s, i) => `
-          <div class="guidance-item">
-            <span class="guidance-num">${i + 1}</span>
-            <div>
-              <p>${escapeHtml(s.action)}</p>
-              <small>${escapeHtml(s.detail || "")}${s.duration ? ' · 耗时：' + escapeHtml(s.duration) : ''}</small>
-            </div>
-          </div>
-        `).join("")}</div>
-      ` : `<p class="history-empty">暂无指导建议。</p>`;
-    }
+    /* ---- 步骤4：预防与总结建议（根因确定后自动生成）---- */
+    els.stepGuidance.innerHTML = `<p class="history-empty" id="guidancePending">完成上方所有原因排查后，将根据确认的根因自动生成针对性预防建议。</p>`;
 
     /* ---- 安全提示 ---- */
     els.safetyText.textContent = item.safety || "请遵守设备制造商和现场安全规程。";
@@ -676,6 +690,7 @@
         causes: item.causes || [],
         solutions: item.solutions || [],
       });
+      diagnosisCountsCache = null; // 新增诊断记录后，刷新知识库「诊断次数」缓存
     } catch (e) {
       console.warn("[app] 保存历史失败:", e);
     }
@@ -772,9 +787,28 @@
   /* ================================================================
    *  知识库管理
    * ================================================================ */
+  async function getDiagnosisCounts() {
+    if (diagnosisCountsCache) return diagnosisCountsCache;
+    try {
+      const records = await window.FaultDB.history.exportAll();
+      const counts = new Map();
+      (Array.isArray(records) ? records : []).forEach(r => {
+        const fid = r.faultId;
+        if (fid && !String(fid).startsWith("ai-")) {
+          counts.set(fid, (counts.get(fid) || 0) + 1);
+        }
+      });
+      diagnosisCountsCache = counts;
+      return counts;
+    } catch {
+      return new Map();
+    }
+  }
+
   async function renderKnowledgeList(filterText) {
     try {
       const imported = await window.FaultDB.faultData.getAll();
+      const counts = await getDiagnosisCounts();
       const totalBuiltIn = builtInDB.length;
       const totalImported = imported.length;
       els.knowledgeStatus.textContent = `内置 ${totalBuiltIn} 条 + 导入 ${totalImported} 条 = 合计 ${mergedDatabase.length} 条`;
@@ -793,13 +827,20 @@
 
       const isImported = (id) => imported.some(e => e.id === id);
 
-      els.knowledgeList.innerHTML = list.map(entry => `
-        <div class="knowledge-card ${isImported(entry.id) ? "imported" : "built-in"}">
+      els.knowledgeList.innerHTML = list.map(entry => {
+        const count = counts.get(entry.id) || 0;
+        const importedEntry = isImported(entry.id);
+        const countClass = count >= 3 ? "hot" : (count > 0 ? "has" : "");
+        return `
+        <div class="knowledge-card ${importedEntry ? "imported" : "built-in"}">
           <div class="kn-header">
             <strong>${escapeHtml(entry.title)}</strong>
-            <span class="kn-badge ${isImported(entry.id) ? "kn-imported" : "kn-builtin"}">
-              ${isImported(entry.id) ? "导入" : "内置"}
-            </span>
+            <div class="kn-badges">
+              <span class="kn-count ${countClass}" title="${count > 0 ? `该故障已诊断命中 ${count} 次` : "暂无诊断记录"}">诊断 ${count} 次</span>
+              <span class="kn-badge ${importedEntry ? "kn-imported" : "kn-builtin"}">
+                ${importedEntry ? "导入" : "内置"}
+              </span>
+            </div>
           </div>
           <div class="kn-meta">
             <span>设备：${escapeHtml(entry.deviceType)}</span>
@@ -807,9 +848,10 @@
             <span>关键词：${(entry.keywords || []).slice(0, 4).join("、")}</span>
           </div>
           <p class="kn-summary">${escapeHtml(entry.summary || "")}</p>
-          ${isImported(entry.id) ? `<button class="text-button kn-delete" data-kn-id="${escapeHtml(entry.id)}" style="color:var(--danger); font-size:12px;">删除此条</button>` : ""}
+          ${importedEntry ? `<button class="text-button kn-delete" data-kn-id="${escapeHtml(entry.id)}" style="color:var(--danger); font-size:12px;">删除此条</button>` : ""}
         </div>
-      `).join("") || `<p class="history-empty">暂无匹配的知识条目。</p>`;
+      `;
+      }).join("") || `<p class="history-empty">暂无匹配的知识条目。</p>`;
     } catch (e) {
       els.knowledgeList.innerHTML = `<p class="history-empty">读取知识库失败。</p>`;
     }
@@ -921,21 +963,31 @@
       `);
     }
 
+    els.importSummary.textContent = "正在统计…";
+    els.importPreview.classList.remove("hidden");
+    els.importResult.classList.add("hidden");
+    updateImportSummary(entries);
+  }
+
+  async function updateImportSummary(entries) {
+    const counts = await getDiagnosisCounts();
+
     const newIds = entries.map(e => e.id);
     const duplicateIds = newIds.filter((id, i) => newIds.indexOf(id) !== i);
-    const conflictWithBuiltIn = entries.filter(e => builtInDB.some(b => b.id === e.id));
+    const conflictWithExisting = entries.filter(e => mergedDatabase.some(m => m.id === e.id));
 
     let summaryParts = [`共解析 ${entries.length} 条有效故障条目`];
-    if (conflictWithBuiltIn.length) {
-      summaryParts.push(`${conflictWithBuiltIn.length} 条与内置条目 ID 重复（将覆盖内置条目）`);
+    if (conflictWithExisting.length) {
+      const detail = conflictWithExisting.map(e =>
+        `${e.title || e.id}（已诊断 ${counts.get(e.id) || 0} 次）`
+      ).join("、");
+      summaryParts.push(`${conflictWithExisting.length} 条与已有条目 ID 重复，将覆盖（原诊断记录保留）：${detail}`);
     }
     if (duplicateIds.length) {
       summaryParts.push(`${duplicateIds.length} 个条目 ID 在导入批次内重复（后者覆盖前者）`);
     }
 
     els.importSummary.textContent = summaryParts.join("；") + "。";
-    els.importPreview.classList.remove("hidden");
-    els.importResult.classList.add("hidden");
   }
 
   async function confirmImport() {
@@ -1229,8 +1281,11 @@
       const evidenceEl = card.querySelector("p");
       const evidence = evidenceEl ? evidenceEl.textContent : "";
 
+      const fullCause = currentCauses.find(c => c.name === name);
+      const prevention = fullCause?.guidance?.prevention || "";
+
       if (card.classList.contains("marked-confirm")) {
-        confirmedCauses.push({ name, probability: prob, evidence });
+        confirmedCauses.push({ name, probability: prob, evidence, prevention });
       } else if (card.classList.contains("marked-ruleout")) {
         ruledOutCauses.push({ name, probability: prob, evidence });
       }
@@ -1281,19 +1336,6 @@
               <p class="report-meta">报告生成时间：${now}</p>
             </div>
           </div>
-
-          <div class="report-section" style="margin-top:12px;">
-            <strong>💡 改进建议</strong>
-            <div class="step-note match-found">
-              <p style="margin:0;">针对根因 <strong>${escapeHtml(primaryRoot?.name || "上述原因")}</strong>，建议：</p>
-              <ul style="margin:6px 0 0 18px; font-size:13px; line-height:1.7;">
-                <li>制定针对性的预防性维护计划，定期检查相关部件</li>
-                <li>将此次故障案例补充到知识库中，便于后续快速定位</li>
-                <li>对相关操作人员进行针对性培训，避免类似误操作</li>
-                <li>考虑增加相应的监测/保护措施，提前预警</li>
-              </ul>
-            </div>
-          </div>
         </div>
       `;
     } else {
@@ -1307,6 +1349,67 @@
         </div>
       `;
     }
+
+    // 根因确定后，生成步骤4的针对性预防建议
+    renderStepGuidance(confirmedCauses);
+  }
+
+  function renderStepGuidance(confirmedCauses) {
+    if (!confirmedCauses.length) {
+      els.stepGuidance.innerHTML = `<p class="history-empty">所有可能原因均已被排除，暂无法给出针对性预防建议，请重新评估故障现象。</p>`;
+      return;
+    }
+
+    const sorted = [...confirmedCauses].sort((a, b) => b.probability - a.probability);
+    const targeted = sorted.filter(c => c.prevention);
+
+    if (targeted.length) {
+      els.stepGuidance.innerHTML = targeted.map(c => `
+        <div class="step-note match-found" style="margin-bottom:8px;">
+          <strong style="display:block;margin-bottom:4px;">🛡 针对「${escapeHtml(c.name)}」的预防建议</strong>
+          ${escapeHtml(c.prevention)}
+        </div>
+      `).join("");
+      return;
+    }
+
+    // 回退：全局预防建议
+    const globalPrevention = currentItem?.guidance?.prevention || "";
+    if (globalPrevention) {
+      els.stepGuidance.innerHTML = `<div class="step-note match-found">🛡 预防建议：${escapeHtml(globalPrevention)}</div>`;
+      return;
+    }
+
+    // 本地知识库：展示解决措施
+    const sols = currentItem?.solutions || [];
+    if (sols.length) {
+      els.stepGuidance.innerHTML = `
+        <div class="guidance-steps">${sols.map((s, i) => `
+          <div class="guidance-item">
+            <span class="guidance-num">${i + 1}</span>
+            <div>
+              <p>${escapeHtml(s.action)}</p>
+              <small>${escapeHtml(s.detail || "")}${s.duration ? ' · 耗时：' + escapeHtml(s.duration) : ''}</small>
+            </div>
+          </div>
+        `).join("")}</div>
+      `;
+      return;
+    }
+
+    // 兜底：通用预防建议
+    const primaryRoot = sorted[0];
+    els.stepGuidance.innerHTML = `
+      <div class="step-note match-found">
+        <p style="margin:0;">针对根因 <strong>${escapeHtml(primaryRoot.name)}</strong>，建议：</p>
+        <ul style="margin:6px 0 0 18px; font-size:13px; line-height:1.7;">
+          <li>制定针对性的预防性维护计划，定期检查相关部件</li>
+          <li>将此次故障案例补充到知识库中，便于后续快速定位</li>
+          <li>对相关操作人员进行针对性培训，避免类似误操作</li>
+          <li>考虑增加相应的监测/保护措施，提前预警</li>
+        </ul>
+      </div>
+    `;
   }
 
   // ── 关闭原因详情对话框 ──
@@ -1343,6 +1446,7 @@
   els.clearHistoryButton.addEventListener("click", async () => {
     if (confirm("确定清空全部诊断历史？此操作不可恢复。")) {
       await window.FaultDB.history.clearAll();
+      diagnosisCountsCache = null;
       await renderRecentHistory();
       if (currentPanel === "history") await renderFullHistory();
     }
@@ -1413,6 +1517,7 @@
       const id = delBtn.dataset.delId;
       if (confirm("确定删除这条诊断记录？")) {
         await window.FaultDB.history.remove(id);
+        diagnosisCountsCache = null;
         await renderFullHistory(
           els.historySearch.value.trim(),
           els.historyDeviceFilter.value
@@ -1426,6 +1531,7 @@
   els.clearAllHistoryBtn.addEventListener("click", async () => {
     if (confirm("确定清空全部诊断历史？此操作不可恢复。")) {
       await window.FaultDB.history.clearAll();
+      diagnosisCountsCache = null;
       await renderFullHistory();
       await renderRecentHistory();
     }

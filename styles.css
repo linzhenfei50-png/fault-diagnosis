@@ -629,6 +629,14 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
   gap: 8px;
 }
 
+/* Per-cause guidance inside cause detail panel */
+.cause-detail-inner .guidance-steps { margin-bottom: 10px; }
+.cause-guidance-tools {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
 /* Small button variant */
 .primary-button.small, .outline-button.small {
   height: 32px;
@@ -891,6 +899,24 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
 }
 .kn-builtin  { color: #5f6570; background: #f2f3f7; }
 .kn-imported { color: var(--primary); background: var(--primary-soft); }
+
+.kn-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.kn-count {
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  background: #f2f3f7;
+  white-space: nowrap;
+}
+.kn-count.has { color: var(--primary); background: var(--primary-soft); }
+.kn-count.hot { color: #b45309; background: #fef3e2; }
 
 .kn-meta {
   display: flex; flex-wrap: wrap; gap: 10px;
